@@ -52,45 +52,46 @@ resource 'vers' (2, "Sleep Assistant") {
 /* uwake22, the DEV build (status row painted): never shipped, and Get Info says so. */
 resource 'vers' (1, "Sleep Assistant") {
 	0x01,
-	0x00,
+	0x01,
 	development,
 	0x00,
 	verUS,
-	"1.0 DEV",
-	"1.0 DEV (uwake22A): paints a status row at the bottom-left of the screen. For troubleshooting only, never ship. Log: System Folder:Sleep Assistant Log."
+	"1.0.1 DEV",
+	"1.0.1 DEV (uwake27A): paints a status row at the bottom-left of the screen. For troubleshooting only, never ship. Log: System Folder:Sleep Assistant Log."
 };
 
 resource 'vers' (2, "Sleep Assistant") {
 	0x01,
-	0x00,
+	0x01,
 	development,
 	0x00,
 	verUS,
-	"1.0 DEV",
-	"Sleep Assistant 1.0 DEV"
+	"1.0.1 DEV",
+	"Sleep Assistant 1.0.1 DEV"
 };
 #else
 /* ★ 1.0 (user, 2026-11-17: "go ahead with 1.0"), uwake22A. A release shows the plain version and nothing else, as
    AirPort's do (Get Info's Version line = vers 1's long string, Extensions Manager = vers 1's short and vers 2's long,
    Apple System Profiler = the numeric bytes); the build is in the log's banner ("Sleep Assistant 1.0 (uwake22A)"). The
-   dev variant above keeps the status row. */
+   dev variant above keeps the status row.
+   1.0.1 (user, 2026-11-23), uwake27A: the log cap, one file. Numeric 01 01 = 1.0.1. */
 resource 'vers' (1, "Sleep Assistant") {
 	0x01,
-	0x00,
+	0x01,
 	release,
 	0x00,
 	verUS,
-	"1.0",
-	"1.0"
+	"1.0.1",
+	"1.0.1"
 };
 
 resource 'vers' (2, "Sleep Assistant") {
 	0x01,
-	0x00,
+	0x01,
 	release,
 	0x00,
 	verUS,
-	"1.0",
-	"Sleep Assistant 1.0"
+	"1.0.1",
+	"Sleep Assistant 1.0.1"
 };
 #endif

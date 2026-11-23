@@ -9,7 +9,8 @@ Apple never supported Mac OS 9 on the FW800 MDD. Its USB ports are on a separate
 deep sleep, and Apple's stock OS 9 USB driver does not know how to handle this correctly. Sleep Assistant prepares the chip before the sleep so that it keeps its state, turns on USB remote wakeup
 so a key can wake the Mac, and checks the chip again at the wake before handing it back to Apple's driver.
 
-> **Status: 1.0, working on real hardware.** Tested on a Power Mac G4 MDD FireWire 800 running Mac OS 9.2.2, with the
+> **Status: 1.0.1. Its sleep and wake code, unchanged since 1.0, works on real hardware.** Tested on a Power Mac G4
+> MDD FireWire 800 running Mac OS 9.2.2, with the
 > stock Mac OS ROM and with the USB 2.0 ROM from [MacOS9-USB2-EHCI](https://github.com/UnexpectedBomb/MacOS9-USB2-EHCI),
 > alongside AirPort Extreme, Bluetooth and the FireWire 800 fix. It is a hobby project, offered as-is; see
 > [Known issues](#known-issues).
@@ -35,7 +36,8 @@ no longer counts as "activity".
 
 Sleep Assistant writes a log called `Sleep Assistant Log` to the System Folder, about six minutes after each wake. It records
 what happened at sleep and wake; send this log if you are reporting a problem. It grows by roughly 100
-to 200 KB per wake; delete it whenever you like and a new one is started.
+to 200 KB per wake, and it keeps itself under 10 MB: when it nears 10 MB, the next startup or wake removes its oldest
+part, so it always holds the most recent 9 to 10 MB. Delete it whenever you like and a new one is started.
 
 ## Compatible G4 Macs
 
@@ -58,10 +60,12 @@ Sleep Assistant cannot fix that (for now), so leave it out on those Macs. I am c
 
 ## Install
 
-1. Download `SleepAssistant_1.0.bin` from [Releases](../../releases) and expand it with StuffIt Expander. You get one
-   file, **Sleep Assistant**, with the Energy Saver icon.
-2. Check its Get Info: the version reads **1.0**.
-3. Drop it into the **Extensions** folder in the System Folder, and restart.
+1. Download `SleepAssistant_1.0.1.bin` from [Releases](../../releases) and expand it with StuffIt Expander. You get
+   one file, **Sleep Assistant**, with the Energy Saver icon.
+2. Check its Get Info: the version reads **1.0.1**.
+3. Drop it into the **Extensions** folder in the System Folder, and restart. Updating from 1.0: replace the old file
+   in the Extensions folder with the new one, and restart. Your existing log carries on; if it is over 10 MB, the
+   first startup removes its oldest part.
 4. Sleep as usual. Wake it with a key on a USB keyboard, the power button, or (if allowed) a Bluetooth keyboard or
    mouse.
 
@@ -77,7 +81,12 @@ second copy stands down. To remove it, drag it out of the Extensions folder and 
   FireWire disks before sleeping, or connect them FW400. If the alert does stay, unplug the FireWire cable for a few
   seconds and plug it back in.
 - **Server volumes are put away at every sleep**; mount them again after the wake.
-- **The log grows** with every wake (see above).
+
+## Versions
+
+- **1.0.1**: the log keeps itself under 10 MB by removing its oldest part (see above); 1.0's log had no limit.
+  Nothing else changed: the sleep and wake code is 1.0's.
+- **1.0**: the first release.
 
 ## How it works
 

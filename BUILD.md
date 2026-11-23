@@ -24,7 +24,7 @@ The result is in `src/build-A/`:
 - `Sleep Assistant`: the same file with its resource fork, for copying onto a disk image directly.
 
 The script stops on the first failure. At the end it checks the package with `scripts/check-package.py`: the file's
-name, type and creator, the version Get Info shows (`1.0`), that the code carries the same build tag as the version
+name, type and creator, the version Get Info shows (`1.0.1`), that the code carries the same build tag as the version
 resource, and that it is not a development build.
 
 ## Options
@@ -35,13 +35,18 @@ resource, and that it is not a development build.
   bottom-left of the screen. It is for troubleshooting only; never install it for everyday use.
 - `UWAKE_QTEST=1` with `BD=<a directory outside src/build*>` builds a self-test variant for the QEMU `mac99` machine,
   where QEMU's OHCI controller stands in for the NEC and a simulated sleep and wake run 90 seconds after startup.
+  Adding `UWAKE_QTEST_LOGSMALL=1` caps the log at 120,000 bytes instead of 10,000,000 and trims it only when a write
+  would pass that, so a single QEMU run exercises the cap.
 
 ## Reproducing the release
 
-The 1.0 release file is `SleepAssistant_1.0.bin`, md5 `77ed30d195bd5a67fe4860eb78b5b93c`. It is the file tested on
-the hardware (md5 `80ed068af08e9ebaf8e769b819469b67`) passed through `scripts/scrub-build-user.py`, which replaces the
-build machine's account name in two file paths that Retro68's prebuilt newlib compiles into the PowerPC code (inert
+The 1.0.1 release file is `SleepAssistant_1.0.1.bin`, md5 `49fe590be314c842e2cab6fe010b878d`. It is this source's
+build (md5 `0ba9d4b2377463b359eab3aa231ac37b`) passed through `scripts/scrub-build-user.py`, which replaces the build
+machine's account name in two file paths that Retro68's prebuilt newlib compiles into the PowerPC code (inert
 error-path strings) with a neutral word of the same length. Those 18 bytes are the only difference.
+
+The 1.0 release file, `SleepAssistant_1.0.bin` (md5 `77ed30d195bd5a67fe4860eb78b5b93c`), was made the same way from
+the build of the 1.0 source (tag `v1.0`) that was tested on the hardware.
 
 A rebuild from this source has a different md5 again, because MacBinary stores the file's creation and modification
 dates and because those two newlib paths name your own account. Apart from those, every resource (the PowerPC code,

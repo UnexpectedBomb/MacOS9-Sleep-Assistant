@@ -80,9 +80,12 @@
 #else
 /* ★ 1.0 (user, 2026-11-17: "Yes, go ahead with 1.0. Make sure to remove the blinking square beacons in the shipping
    version as well."): uwake22A is uwake21A's code with the status row compiled out (UWAKE_PAINT, below). Get Info shows
-   "1.0" only (usb_wake.r, as AirPort's releases do); the build stays visible in the log's banner. */
-#define kUwVer   "1.0"
-#define kUwTag   "uwake22A"
+   "1.0" only (usb_wake.r, as AirPort's releases do); the build stays visible in the log's banner.
+   1.0.1 (user, 2026-11-23: "Just make one single log that will hold the most recent 10 MB worth of sleep-wake data"):
+   uwake27A is 1.0's code plus the log cap (LogTrim, LogTrimAtBoundary and LogFlush below): one file, its oldest part
+   removed in place once it nears 10 MB. */
+#define kUwVer   "1.0.1"
+#define kUwTag   "uwake27A"
 #define kUwMode  "A, keep Apple's stack alive, as on KeyLargo: at the demand (250, after Apple's suspend) the NEC armed to keep its state (PME, D3hot), with remote wakeup on the keyboard's function (uwake11); at the wake D0 first, a restore only if it was lost, interrupts at 350; servers put away before every chosen or idle sleep (uwake12), except an idle sleep Mac OS refuses for sharing (uwake13); a visible EHCI that no driver runs no longer stops it (uwake19); a RUNNING EHCI is suspended and halted at the demand and resumed at the wake (uwake20); a silent Notification Manager request (no mark, icon, sound or text) no longer counts as activity (uwake21)"
 #endif
 
@@ -151,26 +154,147 @@ static char  gLog[48 * 1024];             /* text not yet written */
 static long  gLogLen;
 static short gLogVRef; static long gLogDir; static Boolean gLogReady;
 
-/* TASK LEVEL: append the buffer to the file. The file is NEVER truncated: each boot appends a dated section, so the
-   report of a wake that left no keyboard (written ~3 min after it, before the operator power-cycles) survives the
-   restart. Read from the LAST banner; delete the file before a test to start clean. */
+/* 1.0.1 (user, 2026-11-23: "Just make one single log that will hold the most recent 10 MB worth of sleep-wake data"):
+   ONE file, kept under kLogMax (10,000,000 bytes) by removing its oldest part in place. At a section boundary (a
+   startup's banner, a wake's report), once the file has reached kLogTrimAt, LogTrim keeps its last kLogKeep bytes from
+   the first section header in them ("=== " at a line's start) on, moved to the front: the file still starts at the
+   top of a section and holds the most recent 9 to 10 MB. If one flush between boundaries would carry it past kLogMax,
+   LogFlush trims first. A trim that fails leaves the newest text at the end and the log keeps appending, so the cap
+   never costs a line already written; the next boundary says in the log which step failed and why.
+   UWAKE_QTEST_LOGSMALL (QEMU only): a 120,000-byte cap and no boundary trim, so one run exercises LogFlush's. */
+#define kLogName    "\pSleep Assistant Log"
+#ifdef UWAKE_QTEST_LOGSMALL
+#define kLogMax     120000L
+#define kLogTrimAt  0x7FFFFFFFL
+#define kLogKeep    100000L
+#else
+#define kLogMax     10000000L        /* the file never passes this, unless a trim fails */
+#define kLogTrimAt  9700000L         /* at a boundary, trim once the file has reached this */
+#define kLogKeep    9000000L         /* a trim keeps at most this much, the newest */
+#endif
+#define kLogScan    1000000L         /* how far past the cut a trim looks for a section header */
+
+static Boolean LogFolder(void)            /* TASK LEVEL: the System Folder, once */
+{
+    if (gLogReady) return true;
+    if (FindFolder(kOnSystemDisk, kSystemFolderType, kDontCreateFolder, &gLogVRef, &gLogDir) != noErr) return false;
+    gLogReady = true;
+    return true;
+}
+
+/* The last trim's result and the step it reached, reported in the log at the next section boundary: a cap that
+   silently stops capping would leave only a log too big to explain itself. After a failed trim LogFlush does not try
+   again until that boundary (gLogTrimHold), so a failing disk is not read 9 MB at a time on every flush. */
+static OSErr gLogTrimErr;
+static const char *gLogTrimStep = "";
+static Boolean gLogTrimHold;
+static char gTrimBuf[32 * 1024];         /* LogTrim's chunk (gLog may hold text still to be written) */
+
+/* TASK LEVEL: remove the oldest part of the open log file in place. It keeps the bytes from the first section header
+   at or after *eof - kLogKeep on (from the first line there if no header is found within kLogScan), moves them to the
+   front and shortens the file; *eof becomes the new length. On an error *eof and the file's length are unchanged and the
+   newest text is still at the end: the copy runs front to back with the destination always before the source, so it
+   only ever writes over bytes it has already read. */
+static OSErr LogTrim(short ref, long *eof)
+{
+    long end = *eof, from = end - kLogKeep, lim, pos, start = -1, line = -1, src, dst, n, i;
+    OSErr e;
+    if (from <= 0) return noErr;
+    gLogTrimStep = "looking for a section header";
+    lim = from + kLogScan;
+    if (lim > end) lim = end;
+    for (pos = from - 1; start < 0 && pos + 5 <= lim; pos += n - 4) {    /* chunks overlap by 4: "\r=== " may straddle */
+        n = lim - pos;
+        if (n > (long)sizeof gTrimBuf) n = (long)sizeof gTrimBuf;
+        if ((e = SetFPos(ref, fsFromStart, pos)) != noErr || (e = FSRead(ref, &n, gTrimBuf)) != noErr) return e;
+        if (n < 5) return ioErr;                                         /* (cannot happen: it bounds the loop) */
+        for (i = 0; i + 5 <= n; i++) {
+            if (gTrimBuf[i] != '\r') continue;
+            if (line < 0) line = pos + i + 1;
+            if (gTrimBuf[i + 1] == '=' && gTrimBuf[i + 2] == '=' && gTrimBuf[i + 3] == '=' && gTrimBuf[i + 4] == ' ') {
+                start = pos + i + 1;
+                break;
+            }
+        }
+    }
+    if (start < 0) start = line >= 0 ? line : from;
+    gLogTrimStep = "moving the newest part to the front";
+    for (src = start, dst = 0; src < end; src += n, dst += n) {
+        n = end - src;
+        if (n > (long)sizeof gTrimBuf) n = (long)sizeof gTrimBuf;
+        if ((e = SetFPos(ref, fsFromStart, src)) != noErr || (e = FSRead(ref, &n, gTrimBuf)) != noErr) return e;
+        if ((e = SetFPos(ref, fsFromStart, dst)) != noErr || (e = FSWrite(ref, &n, gTrimBuf)) != noErr) return e;
+        if (n <= 0) return ioErr;                                        /* (cannot happen: it bounds the loop) */
+    }
+    gLogTrimStep = "shortening the file";
+    if ((e = SetEOF(ref, end - start)) != noErr) return e;
+    *eof = end - start;
+    return noErr;
+}
+
+static const char *FmErrName(OSErr e)    /* the File Manager errors a trim can meet, decoded for the log */
+{
+    switch (e) {
+    case ioErr:     return "ioErr: a disk error";
+    case eofErr:    return "eofErr: read past the end of the file";
+    case posErr:    return "posErr: a position before the start of the file";
+    case wrPermErr: return "wrPermErr: not open for writing";
+    case wPrErr:    return "wPrErr: the disk is write-protected";
+    case vLckdErr:  return "vLckdErr: the volume is locked";
+    case fLckdErr:  return "fLckdErr: the file is locked";
+    case dskFulErr: return "dskFulErr: the disk is full";
+    case rfNumErr:  return "rfNumErr: a bad file reference";
+    case fnOpnErr:  return "fnOpnErr: the file is not open";
+    default:        return "not one a trim expects";
+    }
+}
+
+/* TASK LEVEL: append the buffer to the file. Each boot appends a dated section, so the report of a wake that left no
+   keyboard (written ~3 min after it, before the operator power-cycles) survives the restart; 1.0.1 keeps the file to
+   kLogMax (above). Read from the LAST banner; delete the file before a test to start clean. */
 static void LogFlush(void)
 {
     FSSpec sp; short ref; long n, eof; OSErr e;
     if (gLogLen == 0) return;
-    if (!gLogReady) {
-        if (FindFolder(kOnSystemDisk, kSystemFolderType, kDontCreateFolder, &gLogVRef, &gLogDir) != noErr) return;
-        gLogReady = true;
-    }
-    e = FSMakeFSSpec(gLogVRef, gLogDir, "\pSleep Assistant Log", &sp);    /* uwake12: "Sleep Assistant" (user, 2026-11-13) */
+    if (!LogFolder()) return;
+    e = FSMakeFSSpec(gLogVRef, gLogDir, kLogName, &sp);    /* uwake12: "Sleep Assistant" (user, 2026-11-13) */
     if (e == fnfErr) e = FSpCreate(&sp, 'ttxt', 'TEXT', smSystemScript);
     if (e != noErr && e != dupFNErr) return;
     if (FSpOpenDF(&sp, fsRdWrPerm, &ref) != noErr) return;
     if (GetEOF(ref, &eof) != noErr) eof = 0;
+    if (eof + gLogLen > kLogMax && !gLogTrimHold) {          /* 1.0.1: this flush would pass the cap: trim first */
+        if ((gLogTrimErr = LogTrim(ref, &eof)) != noErr) gLogTrimHold = true;   /* eof unchanged: append as before */
+    }
     n = gLogLen;
     if (SetFPos(ref, fsFromStart, eof) == noErr && FSWrite(ref, &n, gLog) == noErr) gLogLen = 0;
     FSClose(ref);
     (void)FlushVol(NULL, gLogVRef);
+}
+
+static void Lg(const char *fmt, ...);
+
+/* 1.0.1, TASK LEVEL, at a section boundary (a startup's banner, a wake's report): what is still pending belongs to the
+   section before, so it is written first; then, once the file has reached kLogTrimAt, its oldest part is removed. A
+   trim that failed, here or in LogFlush since the last boundary, is reported once, at the end of the log. */
+static void LogTrimAtBoundary(void)
+{
+    FSSpec sp; short ref; long eof = 0;
+    LogFlush();
+    gLogTrimHold = false;
+    if (LogFolder() && FSMakeFSSpec(gLogVRef, gLogDir, kLogName, &sp) == noErr
+        && FSpOpenDF(&sp, fsRdWrPerm, &ref) == noErr) {
+        if (GetEOF(ref, &eof) == noErr && eof >= kLogTrimAt) {
+            gLogTrimErr = LogTrim(ref, &eof);
+            FSClose(ref);
+            (void)FlushVol(NULL, gLogVRef);
+        } else FSClose(ref);
+    }
+    if (gLogTrimErr != noErr) {
+        Lg("");
+        Lg("!! the log could not remove its oldest part: %s failed, error %d (%s). It goes on growing and tries again at "
+           "the next startup or wake.", gLogTrimStep, (int)gLogTrimErr, FmErrName(gLogTrimErr));
+        gLogTrimErr = noErr;
+    }
 }
 
 static void Lg(const char *fmt, ...)   /* TASK LEVEL ONLY (it may write the file when the buffer fills) */
@@ -3093,6 +3217,7 @@ static void LogWake(void)                  /* TASK LEVEL: the wake that just fin
 {
     short i, k; UInt32 j, n = gRecN; char ts[32];
     if (n > kRecMax) n = kRecMax;          /* gRecN counts reservations */
+    LogTrimAtBoundary();                   /* 1.0.1: a wake's report is a section boundary */
     LgStamp(ts, sizeof ts);
     Lg("");
     Lg("=== WAKE %lu (report written %s, %lu ms after the wake's first step): what happened, then everything the "
@@ -5725,6 +5850,7 @@ static void InstallHandlers(void)          /* TASK LEVEL (kInitialize, at boot) 
 {
     short i; long lram = 0, vm = 0; char ts[32];
     gBootTicks = kLowTicks;
+    LogTrimAtBoundary();                   /* 1.0.1: a startup is a section boundary */
     LgStamp(ts, sizeof ts);
     Lg("");
     Lg("=== Sleep Assistant %s (%s%s), boot at %s: Apple's own USB stack across the deep sleep of a G4 with the on-board "

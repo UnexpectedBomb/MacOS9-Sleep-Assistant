@@ -40,7 +40,8 @@ cmake -S "$HERE" -B "$BD" -DCMAKE_TOOLCHAIN_FILE="$TC" -DUWAKE_MODE="$MODE" -DUW
     ${UWAKE_QTEST_KEEP:+-DUWAKE_QTEST_KEEP=1} ${UWAKE_QTEST_DISARM:+-DUWAKE_QTEST_DISARM=1} \
     ${UWAKE_QTEST_NOARM:+-DUWAKE_QTEST_NOARM=1} ${UWAKE_QTEST_READVM:+-DUWAKE_QTEST_READVM=1} \
     ${UWAKE_QTEST_CFLOST:+-DUWAKE_QTEST_CFLOST=1} ${UWAKE_QTEST_PRESET:+-DUWAKE_QTEST_PRESET=1} \
-    ${UWAKE_QTEST_PUMP:+-DUWAKE_QTEST_PUMP=1} ${UWAKE_QTEST_NOQUIET:+-DUWAKE_QTEST_NOQUIET=1} >/dev/null
+    ${UWAKE_QTEST_PUMP:+-DUWAKE_QTEST_PUMP=1} ${UWAKE_QTEST_NOQUIET:+-DUWAKE_QTEST_NOQUIET=1} \
+    -DUWAKE_QTEST_LOGSMALL="${UWAKE_QTEST_LOGSMALL:-0}" >/dev/null
 # uwake11: a failed compile used to fall through here (the pipe into grep hid cmake's status) and package the PREVIOUS
 # build's PEF under the new tag. The old PEF is removed first and cmake's own status decides.
 rm -f "${BD:?}/usb_wake_resident.pef"

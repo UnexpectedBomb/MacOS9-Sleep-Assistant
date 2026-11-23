@@ -111,6 +111,12 @@ if(UWAKE_QTEST_NOQUIET)     # QEMU only (uwake21): the control: a silent request
     endif()
     target_compile_definitions(FW800USBWakeResident PRIVATE UWAKE_QTEST_NOQUIET=1)
 endif()
+if(UWAKE_QTEST_LOGSMALL)    # QEMU only (1.0.1): a 120,000-byte log cap and no boundary trim, so LogFlush's trims
+    if(NOT UWAKE_QTEST)
+        message(FATAL_ERROR "UWAKE_QTEST_LOGSMALL is a QEMU build only")
+    endif()
+    target_compile_definitions(FW800USBWakeResident PRIVATE UWAKE_QTEST_LOGSMALL=1)
+endif()
 
 add_custom_command(OUTPUT usb_wake_resident.pef
     COMMAND ${MAKE_PEF} libFW800USBWakeResident.so -o usb_wake_resident.pef
