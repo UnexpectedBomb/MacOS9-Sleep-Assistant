@@ -1,14 +1,12 @@
 # MacOS9-Sleep-Assistant
 
-A **Mac OS 9 system extension that lets a G4 Mac with an NEC USB 2.0 controller sleep and wake with its USB
-intact.** On the Power Mac G4 "Mirrored Drive Doors" FireWire 800 (PowerMac3,6), a Mac OS 9 deep sleep used to end
-in a hang or a dead keyboard and mouse. With Sleep Assistant installed, Special > Sleep, Energy Saver's idle sleep
+A **Mac OS 9 system extension that lets a G4 Mac with an NEC USB 2.0 controller sleep and wake properly.** On the Power Mac G4 "Mirrored Drive Doors" FireWire 800 (PowerMac3,6), a Mac OS 9 deep sleep used to end
+in a hang and/or a dead keyboard and mouse. With Sleep Assistant installed, Special > Sleep, Energy Saver's idle sleep
 and the power key all work: a key on the USB keyboard wakes the Mac, the keyboard and mouse keep working, and USB
 disks stay mounted.
 
 Apple never supported Mac OS 9 on the FW800 MDD. Its USB ports are on a separate NEC chip that loses its state in
-deep sleep, and Apple's OS 9 USB driver does not expect that: at the wake it finds a controller that has forgotten
-everything. Sleep Assistant prepares the chip before the sleep so that it keeps its state, turns on USB remote wakeup
+deep sleep, and Apple's stock OS 9 USB driver does not know how to handle this correctly. Sleep Assistant prepares the chip before the sleep so that it keeps its state, turns on USB remote wakeup
 so a key can wake the Mac, and checks the chip again at the wake before handing it back to Apple's driver.
 
 > **Status: 1.0, working on real hardware.** Tested on a Power Mac G4 MDD FireWire 800 running Mac OS 9.2.2, with the
@@ -18,7 +16,7 @@ so a key can wake the Mac, and checks the chip again at the wake before handing 
 
 ## What it does
 
-At every sleep (chosen from the Special menu, Energy Saver's idle sleep, or the power key):
+At every sleep (chosen from the Special menu, Energy Saver's idle sleep, or the tower's front power button):
 
 - **Puts mounted server volumes away first** (AppleShare), so the Mac does not wake to a dead connection. USB disks
   stay mounted. When Mac OS is going to refuse an idle sleep anyway (for example while File Sharing is on), nothing
@@ -33,28 +31,30 @@ At every sleep (chosen from the Special menu, Energy Saver's idle sleep, or the 
 At every wake it puts back anything the sleep did lose, then hands the controllers back to Apple's driver.
 
 It also lets **Energy Saver's idle sleep** work with the USB 2.0 driver installed: the driver's background keepalive
-no longer counts as activity.
+no longer counts as "activity".
 
-Sleep Assistant writes a log, `Sleep Assistant Log` in the System Folder, about six minutes after each wake. It records
-what happened at the sleep and the wake, and it is the thing to send with a problem report. It grows by roughly 100
+Sleep Assistant writes a log called `Sleep Assistant Log` to the System Folder, about six minutes after each wake. It records
+what happened at sleep and wake; send this log if you are reporting a problem. It grows by roughly 100
 to 200 KB per wake; delete it whenever you like and a new one is started.
 
-## Which Macs
+## Compatible G4 Macs
 
-Sleep Assistant does not make a Mac sleep. It keeps the NEC USB chip working through a sleep the Mac can already do.
-So it can help a G4 only if Mac OS 9 can sleep that Mac's processor, and the Mac's USB is on the NEC chip.
+Sleep Assistant does not make a Mac sleep; it just keeps the NEC USB chip working through sleep, preventing a crash.
+It can help a G4 only if:
+
+1) Mac OS 9 can sleep that Mac's processor
+2) The Mac's USB is on the NEC chip.
 
 | Mac | Processor | NEC USB 2.0 | Sleep Assistant |
 |---|---|---|---|
 | Power Mac G4 MDD FireWire 800 (PowerMac3,6) | 7455 | yes | **tested, works** |
 | iMac G4 15-inch 1.0 GHz, 17- and 20-inch 1.25 GHz (2003, PowerMac6,3) | 7445 (7455 family) | yes | may work, **untested**: reports welcome |
-| PowerBook G4 12-inch 867 MHz (PowerBook6,1), 17-inch 1.0 GHz (PowerBook5,1) | 7455 | no (USB 1.1) | nothing for it to do |
-| PowerBook G4 from September 2003 on, iBook G4, eMac 1.25/1.42 GHz, Mac mini G4 | 7447, 7457 or 7447A | yes | **leave it out** (below) |
+| AlBook G4 12-inch 867 MHz (PowerBook6,1), 17-inch 1.0 GHz (PowerBook5,1) | 7455 | no (USB 1.1) | nothing for it to do |
+| AlBook G4 (Sep 2003 onwards), iBook G4, eMac 1.25/1.42 GHz, Mac mini G4 | 7447, 7457 or 7447A | yes | **DO NOT USE** (below) |
 
-Mac OS 9's processor sleep code does not know the 7447, 7457 or 7447A. On those Macs a sleep crashes, or Energy Saver
-reports missing software, before USB is ever involved; that is why the Mac mini's OS 9 install removes Energy Saver.
-Sleep Assistant cannot fix that, so leave it out on those Macs: it cannot help, and on the Mac mini it can let an idle
-sleep start that the USB 2.0 driver's activity would otherwise hold off.
+Mac OS 9's processor sleep code does not know the 7447, 7457 or 7447A. On those Macs, a sleep crashes (or Energy Saver
+reports missing software) before USB is ever involved; that is why the Mac Mini's OS 9 installer removes Energy Saver.
+Sleep Assistant cannot fix that (for now), so leave it out on those Macs. I am currently working on a sleep fix for the G4 Mini specifically, which I'm hoping will unlock many other G4 machines if successful. Stay tuned!
 
 ## Install
 
